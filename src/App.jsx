@@ -16,42 +16,83 @@ const agents = [
   },
 ];
 
-const Stickman = ({ color }) => {
+const Stickman = ({ color, theme }) => {
+  const ringRef1 = useRef();
+  const ringRef2 = useRef();
+  
+  useFrame((state) => {
+    if (ringRef1.current) ringRef1.current.rotation.z += 0.02;
+    if (ringRef2.current) {
+      ringRef2.current.rotation.z -= 0.015;
+      ringRef2.current.rotation.x = Math.sin(state.clock.elapsedTime) * 0.2 + Math.PI / 2.2;
+    }
+  });
+
+  const glowingMat = <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />;
+  const frameMat = <meshStandardMaterial color={theme === 'dark' ? "#ffffff" : "#0284c7"} metalness={theme === 'dark' ? 0.9 : 0.1} roughness={0.3} />;
+
   return (
     <group position={[0, -0.5, 0]}>
-      {/* Head */}
+      {/* Glowing Neural Core Head */}
       <mesh position={[0, 1.8, 0]}>
-        <sphereGeometry args={[0.3, 32, 32]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.2} />
+        <sphereGeometry args={[0.22, 32, 32]} />
+        {glowingMat}
       </mesh>
-      {/* Torso */}
+      
+      {/* Cybernetic Skeleton */}
       <mesh position={[0, 0.7, 0]}>
-        <cylinderGeometry args={[0.08, 0.08, 1.6, 16]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.1} />
+        <cylinderGeometry args={[0.04, 0.08, 1.6, 16]} />
+        {frameMat}
       </mesh>
-      {/* Arms Setup (Waving) */}
-      <mesh position={[-0.4, 1.2, 0]} rotation={[0, 0, Math.PI / 4]}>
-        <cylinderGeometry args={[0.06, 0.06, 1.2, 16]} />
-        <meshStandardMaterial color={color} />
+
+      {/* Shoulder Nodes */}
+      <mesh position={[-0.2, 1.45, 0]}><sphereGeometry args={[0.08, 16, 16]} />{glowingMat}</mesh>
+      <mesh position={[0.2, 1.45, 0]}><sphereGeometry args={[0.08, 16, 16]} />{glowingMat}</mesh>
+
+      {/* Arms */}
+      <mesh position={[-0.45, 1.0, 0]} rotation={[0, 0, Math.PI / 6]}>
+        <cylinderGeometry args={[0.04, 0.04, 1.0, 16]} />
+        {frameMat}
       </mesh>
-      <mesh position={[0.4, 1.2, 0]} rotation={[0, 0, -Math.PI / 4]}>
-        <cylinderGeometry args={[0.06, 0.06, 1.2, 16]} />
-        <meshStandardMaterial color={color} />
+      <mesh position={[0.45, 1.0, 0]} rotation={[0, 0, -Math.PI / 6]}>
+        <cylinderGeometry args={[0.04, 0.04, 1.0, 16]} />
+        {frameMat}
       </mesh>
+
+      {/* Hip Nodes */}
+      <mesh position={[-0.1, -0.05, 0]}><sphereGeometry args={[0.08, 16, 16]} />{glowingMat}</mesh>
+      <mesh position={[0.1, -0.05, 0]}><sphereGeometry args={[0.08, 16, 16]} />{glowingMat}</mesh>
+
       {/* Legs */}
-      <mesh position={[-0.22, -0.65, 0]} rotation={[0, 0, -Math.PI / 8]}>
-        <cylinderGeometry args={[0.08, 0.08, 1.3, 16]} />
-        <meshStandardMaterial color={color} />
+      <mesh position={[-0.25, -0.7, 0]} rotation={[0, 0, -Math.PI / 12]}>
+        <cylinderGeometry args={[0.05, 0.03, 1.3, 16]} />
+        {frameMat}
       </mesh>
-      <mesh position={[0.22, -0.65, 0]} rotation={[0, 0, Math.PI / 8]}>
-        <cylinderGeometry args={[0.08, 0.08, 1.3, 16]} />
-        <meshStandardMaterial color={color} />
+      <mesh position={[0.25, -0.7, 0]} rotation={[0, 0, Math.PI / 12]}>
+        <cylinderGeometry args={[0.05, 0.03, 1.3, 16]} />
+        {frameMat}
+      </mesh>
+      
+      {/* Reactor Chest Core */}
+      <mesh position={[0, 1.1, 0.08]}>
+        <sphereGeometry args={[0.1, 16, 16]} />
+        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={3} />
+      </mesh>
+
+      {/* Rotating Data Rings */}
+      <mesh ref={ringRef1} position={[0, 1.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.5, 0.015, 16, 100]} />
+        {glowingMat}
+      </mesh>
+      <mesh ref={ringRef2} position={[0, 0.5, 0]} rotation={[Math.PI / 2.2, 0, 0]}>
+        <torusGeometry args={[0.8, 0.01, 16, 100]} />
+        {glowingMat}
       </mesh>
     </group>
   );
 };
 
-function Agent({ id, position, color, message, onClick }) {
+function Agent({ id, position, color, message, onClick, animState, theme }) {
   const groupRef = useRef();
   const [hovered, setHovered] = useState(false);
   const [dropped, setDropped] = useState(false);
@@ -73,22 +114,28 @@ function Agent({ id, position, color, message, onClick }) {
       return;
     }
 
-    // Wander towards target smoothly
-    currentPos.lerp(target, delta);
-    groupRef.current.position.copy(currentPos);
-    
-    // Add floating bob effect
-    groupRef.current.position.y += Math.sin(state.clock.elapsedTime * 3 + id) * 0.03;
-
-    // Periodically pick new random target for wandering
-    if (currentPos.distanceTo(target) < 0.2) {
-      if (Math.random() > 0.98) {
-        setTarget(new THREE.Vector3(
-          position[0] + (Math.random() - 0.5) * 5,
-          position[1], // base height
-          position[2] + (Math.random() - 0.5) * 5
-        ));
+    if (animState === 'float') {
+      currentPos.lerp(target, delta);
+      groupRef.current.position.copy(currentPos);
+      groupRef.current.position.y += Math.sin(state.clock.elapsedTime * 3 + id) * 0.03;
+      const targetRotY = (state.pointer.x * Math.PI) / 3;
+      const targetRotX = -(state.pointer.y * Math.PI) / 8;
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotY, 0.08);
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRotX, 0.08);
+      if (currentPos.distanceTo(target) < 0.2 && Math.random() > 0.98) {
+        setTarget(new THREE.Vector3(position[0] + (Math.random() - 0.5) * 5, position[1], position[2] + (Math.random() - 0.5) * 5));
       }
+    } else if (animState === 'jump') {
+      currentPos.lerp(new THREE.Vector3(...position), delta * 5);
+      groupRef.current.position.copy(currentPos);
+      groupRef.current.position.y += Math.abs(Math.sin(state.clock.elapsedTime * 2.5)) * 1.2;
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, 0, 0.1);
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
+    } else if (animState === 'still') {
+      currentPos.lerp(new THREE.Vector3(...position), delta * 5);
+      groupRef.current.position.copy(currentPos);
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, 0, 0.1);
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
     }
   });
 
@@ -101,10 +148,41 @@ function Agent({ id, position, color, message, onClick }) {
       onPointerOut={(e) => { e.stopPropagation(); setHovered(false); }}
       scale={hovered ? 1.4 : 1.2}
     >
-      <Stickman color={color} />
+      <Stickman color={color} theme={theme} />
     </group>
   );
 }
+
+const GlobalGrid = () => {
+  const gridRef = useRef();
+  useFrame(() => {
+    if (gridRef.current) {
+      gridRef.current.rotation.y -= 0.0005;
+      gridRef.current.rotation.x -= 0.0002;
+    }
+  });
+  return (
+    <mesh ref={gridRef}>
+      <sphereGeometry args={[25, 32, 32]} />
+      <meshBasicMaterial color="#00f3ff" wireframe={true} transparent={true} opacity={0.03} />
+    </mesh>
+  );
+};
+
+const TypewriterText = ({ text }) => {
+  const [displayed, setDisplayed] = useState("");
+  useEffect(() => {
+    let i = 0;
+    setDisplayed("");
+    const interval = setInterval(() => {
+      setDisplayed(text.slice(0, i));
+      i++;
+      if (i > text.length) clearInterval(interval);
+    }, 15);
+    return () => clearInterval(interval);
+  }, [text]);
+  return <span>{displayed}</span>;
+};
 
 export default function App() {
   const [activeSession, setActiveSession] = useState(null);
@@ -112,8 +190,21 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [language, setLanguage] = useState('en');
+  const [theme, setTheme] = useState('dark');
+  const [animState, setAnimState] = useState('float');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const closeTimeoutRef = useRef(null);
   const chatHistoryRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const tutorialContent = [
     { title: "Welcome to Rescue-Net", text: "Welcome to the Phase 3 Emergency System. Let me guide you on how to test this AI Agent." },
@@ -247,6 +338,23 @@ export default function App() {
           { text: "ಕಾಣೆಯಾದವರ ಅಲರ್ಟ್ ಅನ್ನು ಎಲ್ಲಾ ಪೊಲೀಸ್ ಘಟಕಗಳಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ. ಒಬ್ಬ ಅಧಿಕಾರಿಯನ್ನು ನೇಮಿಸಲಾಗಿದೆ.", delay: 2500, type: 'response' }
         ]
       },
+      disaster: {
+        en: [
+          { text: "🔥 [DISASTER AGENT]: Severe environmental threat detected. Scanning thermal satellite feeds...", delay: 300, type: 'action' },
+          { text: "🚁 [EVACUATION]: Dispatching aerial water-bombers and routing fire engines.", delay: 1500, type: 'action' },
+          { text: "Disaster protocol activated. Fire and rescue teams are en route. Please evacuate carefully.", delay: 3000, type: 'response' }
+        ],
+        hi: [
+          { text: "🔥 [आपदा एजेंट]: गंभीर खतरे की पहचान की गई। सैटेलाइट फीड जांची जा रही है...", delay: 300, type: 'action' },
+          { text: "🚁 [निकासी]: बचाव दल भेजे जा रहे हैं।", delay: 1500, type: 'action' },
+          { text: "आपातकालीन स्थिति सक्रिय। कृपया तुरंत सुरक्षित बाहर निकलें।", delay: 3000, type: 'response' }
+        ],
+        kn: [
+          { text: "🔥 [ವಿಪತ್ತು ಏಜೆಂಟ್]: ಗಂಭೀರ ವಿಪತ್ತು ಪತ್ತೆಯಾಗಿದೆ. ಉಪಗ್ರಹ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ...", delay: 300, type: 'action' },
+          { text: "🚁 [ಸ್ಥಳಾಂತರಿಸುವಿಕೆ]: ಅಗ್ನಿಶಾಮಕ ದಳವನ್ನು ರವಾನಿಸಲಾಗುತ್ತಿದೆ.", delay: 1500, type: 'action' },
+          { text: "ವಿಪತ್ತು ಪ್ರೋಟೋಕಾಲ್ ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಎಚ್ಚರಿಕೆಯಿಂದ ಸ್ಥಳಾಂತರಿಸಿ.", delay: 3000, type: 'response' }
+        ]
+      },
       hello: {
         en: [
           { text: "🧠 [SYSTEM]: Core neural link established. Ready for emergency protocols.", delay: 300, type: 'action' },
@@ -273,6 +381,7 @@ export default function App() {
     else if (/unconscious|blood|identity|who|behosh|khoon|pehchan|prajne|rakta/i.test(lowerInput)) intent = 'identity';
     else if (/money|pay|fund|insurance|wallet|paisa|bima|hana|dudu|vime/i.test(lowerInput)) intent = 'finance';
     else if (/missing|lost|police|chori|lapata|kaledu|huduku/i.test(lowerInput)) intent = 'missing';
+    else if (/fire|burn|earthquake|flood|disaster|aag|bhookamp|benki|jal/i.test(lowerInput)) intent = 'disaster';
     else if (/hi|hello|namaste|namaskara|hey/i.test(lowerInput)) intent = 'hello';
 
     const sequence = sequences[intent][language];
@@ -359,6 +468,17 @@ export default function App() {
 
   return (
     <>
+      <div className="controls-bar">
+        <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="tutorial-btn" style={{ padding: '8px 15px', fontSize: '0.8rem' }}>
+          {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
+        </button>
+        <select value={animState} onChange={(e) => setAnimState(e.target.value)} className="tutorial-btn" style={{ padding: '8px 15px', fontSize: '0.8rem', background: 'var(--glass-bg)', color: 'var(--neon-blue)', outline: 'none' }}>
+          <option value="float">Hover Mode</option>
+          <option value="jump">Jump Mode</option>
+          <option value="still">Stand Still</option>
+        </select>
+      </div>
+
       <div className="app-header">
         <div className="app-subtitle">Phase 3 Emergency AI</div>
         <h2>Rescue-Net</h2>
@@ -390,7 +510,7 @@ export default function App() {
           <div className="chat-history" ref={chatHistoryRef}>
             {activeSession.history.map((msg, idx) => (
               <div key={idx} className={`message-bubble ${msg.sender === 'user' ? 'message-user' : (msg.isAction ? 'message-action' : 'message-agent')}`}>
-                {msg.text}
+                {msg.sender === 'user' ? msg.text : <TypewriterText text={msg.text} />}
               </div>
             ))}
           </div>
@@ -417,39 +537,42 @@ export default function App() {
 
       {tutorialStep < tutorialContent.length && !activeSession && (
         <div className="tutorial-panel">
-          <div className="pulse-dot" style={{ position: 'absolute', top: 20, right: 20 }}></div>
+          <button type="button" onClick={() => setTutorialStep(tutorialContent.length)} className="close-btn" style={{ position: 'absolute', top: 15, right: 15 }} title="Skip Tour">✕</button>
           <div className="tutorial-title">{tutorialContent[tutorialStep].title}</div>
           <div className="tutorial-text">{tutorialContent[tutorialStep].text}</div>
           <button 
             className="tutorial-btn" 
             onClick={() => setTutorialStep(s => s + 1)}
           >
-            {tutorialStep === tutorialContent.length - 1 ? "Start Simulation" : "Next ➔"}
+            {tutorialStep === tutorialContent.length - 1 ? "Start System" : "Next Phase ➔"}
           </button>
           
           <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '8px' }}>
             {tutorialContent.map((_, i) => (
-              <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i === tutorialStep ? 'var(--neon-blue)' : 'rgba(255,255,255,0.2)' }} />
+              <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i === tutorialStep ? 'var(--neon-blue)' : 'rgba(255,255,255,0.2)', boxShadow: i === tutorialStep ? '0 0 10px var(--neon-blue)' : 'none', transition: 'all 0.3s ease' }} />
             ))}
           </div>
         </div>
       )}
 
       <Canvas style={{ height: '100vh', width: '100vw', position: 'absolute', top: 0, left: 0, zIndex: 0 }} camera={{ position: [0, 5, 12], fov: 45 }}>
-        <color attach="background" args={['#0a0e17']} />
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[5, 10, 7]} intensity={1.5} color="#00f3ff" />
+        <color attach="background" args={[theme === 'dark' ? '#0a0e17' : '#faf8f5']} />
+        <ambientLight intensity={theme === 'dark' ? 0.4 : 0.8} />
+        <directionalLight position={[5, 10, 7]} intensity={theme === 'dark' ? 1.5 : 0.8} color="#00f3ff" />
         <pointLight position={[-5, -5, -5]} intensity={1} color="#ff00f3" />
-        <Sparkles count={200} scale={25} size={3} speed={0.2} opacity={0.4} noise={0.1} color="#00f3ff" />
-        <Sparkles count={50} scale={15} size={5} speed={0.5} opacity={0.2} noise={0.2} color="#ffffff" />
+        <GlobalGrid />
+        <Sparkles count={200} scale={25} size={3} speed={0.2} opacity={0.4} noise={0.1} color={theme === 'dark' ? '#00f3ff' : '#0ea5e9'} />
+        <Sparkles count={50} scale={15} size={5} speed={0.5} opacity={0.2} noise={0.2} color={theme === 'dark' ? '#ffffff' : '#0f172a'} />
         {agents.map(agent => (
           <Agent
             key={agent.id}
             id={agent.id}
-            position={agent.position}
-            color={agent.color}
+            position={[isMobile ? 0 : agent.position[0], isMobile ? agent.position[1] - 2 : agent.position[1], agent.position[2]]}
+            color={theme === 'dark' ? agent.color : '#0284c7'}
             message={agent.message}
             onClick={() => handleAgentClick(agent)}
+            animState={animState}
+            theme={theme}
           />
         ))}
       </Canvas>
